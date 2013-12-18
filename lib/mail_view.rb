@@ -23,6 +23,7 @@ class MailView
 
   def call(env)
     request = Rack::Request.new(env)
+    @params = request.params
 
     if request.path_info == "" || request.path_info == "/"
       links = self.actions.map do |action|
@@ -52,7 +53,7 @@ class MailView
         # Otherwise, show our message headers & frame the body.
         else
           part = find_preferred_part(mail, [format, 'text/html', 'text/plain'])
-          ok email_template.render(Object.new, :name => name, :mail => mail, :part => part, :part_url => part_body_url(part))
+          ok email_template.render(Object.new, :name => name, :mail => mail, :part => part, :part_url => part_body_url(part, env["QUERY_STRING"]))
         end
       else
         not_found
@@ -103,14 +104,23 @@ class MailView
       mail
     end
 
+    def params
+      @params || {}
+    end
+
     def find_preferred_part(mail, formats)
       found = nil
       formats.find { |f| found = find_part(mail, f) }
       found || mail
     end
 
-    def part_body_url(part)
-      '?part=%s' % Rack::Utils.escape([part.main_type, part.sub_type].compact.join('/'))
+    def part_body_url(part, query="")
+      format = 'part=%s' % Rack::Utils.escape([part.main_type, part.sub_type].compact.join('/'))
+      if query == ""
+        '?' + format
+      else
+        "?#{query}&#{format}"
+      end
     end
 
     def find_part(mail, matching_content_type)
